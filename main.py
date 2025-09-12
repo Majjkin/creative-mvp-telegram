@@ -1,11 +1,12 @@
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from datetime import datetime, timedelta
 from typing import List, Optional, Literal, Dict, Any
 from pydantic import BaseModel
 import os
 import asyncio
 import logging
+import io
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -108,29 +109,13 @@ class TelegramClient:
             return self._get_demo_posts(channel_username, limit)
         
         try:
-            # Создаем папку для временных фото
-            import os
-            os.makedirs("temp_photos", exist_ok=True)
-            
             logger.info(f"🔍 Fetching real posts from {channel_username}")
             posts = []
             async for message in self.client.iter_messages(channel_username, limit=limit*2):
                 if message.views and message.views >= min_views:
-                    # Получаем реальные фото из Telegram
+                    # Используем прокси-сервер для получения реальных фото
                     if message.photo:
-                        try:
-                            # Скачиваем фото и получаем временную ссылку
-                            photo_path = await self.client.download_media(message.photo, file=f"temp_photos/{channel_username}_{message.id}.jpg")
-                            if photo_path:
-                                # Загружаем на наш сервер или используем временную ссылку
-                                media_url = f"https://picsum.photos/seed/real-{channel_username}-{message.id}/400/600"
-                            else:
-                                media_url = f"https://picsum.photos/seed/photo-{message.id}/400/600"
-                        except Exception as e:
-                            logger.error(f"❌ Error downloading photo: {e}")
-                            media_url = f"https://picsum.photos/seed/photo-{message.id}/400/600"
-                    elif message.video:
-                        media_url = f"https://picsum.photos/seed/video-{message.id}/400/600"
+                        media_url = f"/photo/{channel_username}/{message.id}"
                     else:
                         media_url = f"https://picsum.photos/seed/creative-{message.id}/400/600"
                     
@@ -183,7 +168,7 @@ class TelegramClient:
     def _get_media_url(self, message):
         """Получение URL медиа из сообщения"""
         if message.photo:
-            return f"https://picsum.photos/seed/tg-photo-{message.id}/400/600"
+            return f"https://picsum.photos/seed/tg-{message.id}/400/600"
         elif message.video:
             return f"https://picsum.photos/seed/tg-video-{message.id}/400/600"
         else:
@@ -285,6 +270,38 @@ async def creative_generate(prompt: Optional[str] = None):
         "seed": 12345,
         "provider": "demo"
     }
+
+@app.get("/photo/{channel}/{message_id}")
+async def get_photo(channel: str, message_id: int):
+    """Получение фото из Telegram через прокси"""
+    try:
+        # Подключаемся к Telegram если еще не подключены
+        await telegram_client.connect()
+        
+        if not telegram_client.client:
+            raise HTTPException(500, "Telegram client not connected")
+        
+        # Получаем сообщение
+        message = await telegram_client.client.get_messages(channel, ids=message_id)
+        if not message or not message.photo:
+            raise HTTPException(404, "Photo not found")
+        
+        # Скачиваем фото в память
+        photo_bytes = await telegram_client.client.download_media(message.photo, file=bytes)
+        
+        if not photo_bytes:
+            raise HTTPException(404, "Photo download failed")
+        
+        # Возвращаем фото как поток
+        return StreamingResponse(
+            io.BytesIO(photo_bytes),
+            media_type="image/jpeg",
+            headers={"Cache-Control": "public, max-age=3600"}
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting photo: {e}")
+        raise HTTPException(500, f"Error getting photo: {str(e)}")
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui():
