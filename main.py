@@ -11,7 +11,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Creative Trends MVP - Railway Telegram")
+app = FastAPI(title="Creative Trends MVP - Railway Stable")
 
 # Простые модели данных
 Category = Literal["fashion","home","beauty"]
@@ -110,25 +110,31 @@ class TelegramClient:
         try:
             logger.info(f"🔍 Fetching real posts from {channel_username}")
             posts = []
+            count = 0
             async for message in self.client.iter_messages(channel_username, limit=limit*2):
-                if message.views and message.views >= min_views:
-                    post_data = {
-                        'id': f"{channel_username}_{message.id}",
-                        'channel': channel_username,
-                        'message_id': message.id,
-                        'text': message.text or "No text",
-                        'views': message.views or 0,
-                        'likes': getattr(message.reactions, 'count', 0) if message.reactions else 0,
-                        'comments': message.replies.replies if message.replies else 0,
-                        'date': message.date.isoformat(),
-                        'media_url': self._get_media_url(message),
-                        'post_url': f"https://t.me/{channel_username}/{message.id}"
-                    }
-                    posts.append(post_data)
-                    logger.info(f"📄 Found post {message.id} with {message.views} views")
-                    
-                    if len(posts) >= limit:
-                        break
+                try:
+                    if message.views and message.views >= min_views:
+                        post_data = {
+                            'id': f"{channel_username}_{message.id}",
+                            'channel': channel_username,
+                            'message_id': message.id,
+                            'text': (message.text or "No text")[:200],  # Ограничиваем длину текста
+                            'views': message.views or 0,
+                            'likes': getattr(message.reactions, 'count', 0) if message.reactions else 0,
+                            'comments': message.replies.replies if message.replies else 0,
+                            'date': message.date.isoformat(),
+                            'media_url': f"https://picsum.photos/seed/tg-{channel_username}-{message.id}/400/600",
+                            'post_url': f"https://t.me/{channel_username}/{message.id}"
+                        }
+                        posts.append(post_data)
+                        count += 1
+                        logger.info(f"📄 Found post {message.id} with {message.views} views")
+                        
+                        if count >= limit:
+                            break
+                except Exception as e:
+                    logger.error(f"❌ Error processing message {message.id}: {e}")
+                    continue
             
             posts.sort(key=lambda x: x['views'], reverse=True)
             logger.info(f"✅ Retrieved {len(posts)} posts from {channel_username}")
@@ -157,15 +163,6 @@ class TelegramClient:
             }
             posts.append(post_data)
         return posts
-    
-    def _get_media_url(self, message):
-        """Получение URL медиа из сообщения"""
-        if message.photo:
-            return f"https://picsum.photos/seed/tg-photo-{message.id}/400/600"
-        elif message.video:
-            return f"https://picsum.photos/seed/tg-video-{message.id}/400/600"
-        else:
-            return f"https://picsum.photos/seed/tg-default-{message.id}/400/600"
 
 # Создаем экземпляр Telegram клиента
 telegram_client = TelegramClient()
