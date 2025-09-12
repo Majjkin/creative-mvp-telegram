@@ -161,7 +161,7 @@ class TelegramClient:
     def _get_media_url(self, message):
         """Получение URL медиа из сообщения"""
         if message.photo:
-            return f"https://picsum.photos/seed/tg-{message.id}/400/600"
+            return f"https://picsum.photos/seed/tg-photo-{message.id}/400/600"
         elif message.video:
             return f"https://picsum.photos/seed/tg-video-{message.id}/400/600"
         else:
