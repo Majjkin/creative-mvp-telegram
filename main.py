@@ -281,8 +281,15 @@ async def get_photo(channel: str, message_id: int):
         if not telegram_client.client:
             raise HTTPException(500, "Telegram client not connected")
         
-        # Получаем сообщение
-        message = await telegram_client.client.get_messages(channel, ids=message_id)
+        # Получаем сообщение (используем правильный формат)
+        try:
+            # Пробуем получить канал по username
+            entity = await telegram_client.client.get_entity(channel)
+            message = await telegram_client.client.get_messages(entity, ids=message_id)
+        except Exception as e:
+            logger.error(f"❌ Error getting entity {channel}: {e}")
+            raise HTTPException(404, f"Channel {channel} not found: {str(e)}")
+        
         if not message or not message.photo:
             raise HTTPException(404, "Photo not found")
         
