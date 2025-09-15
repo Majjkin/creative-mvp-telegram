@@ -76,31 +76,9 @@ class TelegramClient:
         self.lock = asyncio.Lock()
         
     async def connect(self):
-        logger.info(f"🔑 TELEGRAM_API_ID: {self.api_id}")
-        logger.info(f"🔑 TELEGRAM_API_HASH: {self.api_hash[:10]}..." if self.api_hash else "None")
-        logger.info(f"🔑 TELEGRAM_SESSION: {self.session_string[:20]}..." if self.session_string else "None")
-        
-        if not self.api_id or not self.api_hash or not self.session_string:
-            logger.warning("❌ Telegram credentials not found, using demo mode")
-            return False
-            
-        try:
-            from telethon import TelegramClient
-            from telethon.sessions import StringSession
-            
-            async with self.lock:
-                if not self.client:
-                    self.client = TelegramClient(
-                        StringSession(self.session_string), 
-                        self.api_id, 
-                        self.api_hash
-                    )
-                    await self.client.start()
-                    logger.info("✅ Telegram client connected successfully!")
-                    return True
-        except Exception as e:
-            logger.error(f"❌ Failed to connect to Telegram: {e}")
-            return False
+        """Подключение к Telegram - ОТКЛЮЧЕНО ДЛЯ СТАБИЛЬНОСТИ"""
+        logger.info("🎭 Telegram API disabled for stability - using demo mode only")
+        return False
     
     async def get_channel_posts(self, channel_username: str, limit: int = 50, min_views: int = 10000):
         """Получение постов из канала с фильтрацией по просмотрам"""
@@ -175,8 +153,8 @@ async def get_channel_posts(category: str, limit: int = 50):
     if category not in CHANNELS:
         return {"error": "Invalid category", "posts": []}
     
-    # Подключаемся к Telegram если еще не подключены
-    await telegram_client.connect()
+    # Используем только демо данные для стабильности
+    logger.info("🎭 Using demo mode for all channels")
     
     all_posts = []
     for channel in CHANNELS[category]:
