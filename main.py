@@ -37,7 +37,7 @@ class PromptReq(BaseModel):
 
 # Демо данные
 CHANNELS = {
-    "fashion": ["burimovasasha", "rogov24", "zarina_brand", "limeofficial", "ekonika"],
+    "fashion": ["burimovasasha", "rogov24", "zarina_brand", "limeofficial", "ekonika", "sela_brand", "lichi", "befree_community", "mordorblog", "bymirraa"],
     "beauty": ["goldapple_ru", "glamguruu", "marietells", "sofikshenzdes", "writeforfriends"],
     "home": ["casacozy", "homiesapiens", "home_where", "objectdesigner"]
 }
