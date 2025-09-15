@@ -104,57 +104,9 @@ class TelegramClient:
     
     async def get_channel_posts(self, channel_username: str, limit: int = 50, min_views: int = 10000):
         """Получение постов из канала с фильтрацией по просмотрам"""
-        if not self.client:
-            logger.info(f"📱 Using demo data for {channel_username}")
-            return self._get_demo_posts(channel_username, limit)
-        
-        try:
-            logger.info(f"🔍 Fetching real posts from {channel_username}")
-            posts = []
-            
-            # Получаем entity канала
-            try:
-                entity = await self.client.get_entity(channel_username)
-                logger.info(f"✅ Found channel: {entity.title} (ID: {entity.id})")
-            except Exception as e:
-                logger.error(f"❌ Channel {channel_username} not found: {e}")
-                # Попробуем найти канал по ID или другим способом
-                logger.info(f"🔍 Trying alternative methods for {channel_username}")
-                return self._get_demo_posts(channel_username, limit)
-            
-            async for message in self.client.iter_messages(entity, limit=limit*2):
-                if message.views and message.views >= min_views:
-                    # Используем прокси-сервер для получения реальных фото
-                    if message.photo:
-                        media_url = f"/photo/{channel_username}/{message.id}"
-                    else:
-                        media_url = f"https://picsum.photos/seed/creative-{message.id}/400/600"
-                    
-                    post_data = {
-                        'id': f"{channel_username}_{message.id}",
-                        'channel': channel_username,
-                        'message_id': message.id,
-                        'text': (message.text or "No text")[:200],  # Ограничиваем длину текста
-                        'views': message.views or 0,
-                        'likes': getattr(message.reactions, 'count', 0) if message.reactions else 0,
-                        'comments': message.replies.replies if message.replies else 0,
-                        'date': message.date.isoformat(),
-                        'media_url': media_url,
-                        'post_url': f"https://t.me/{channel_username}/{message.id}"
-                    }
-                    posts.append(post_data)
-                    logger.info(f"📄 Found post {message.id} with {message.views} views")
-                    
-                    if len(posts) >= limit:
-                        break
-            
-            posts.sort(key=lambda x: x['views'], reverse=True)
-            logger.info(f"✅ Retrieved {len(posts)} posts from {channel_username}")
-            return posts[:limit]
-            
-        except Exception as e:
-            logger.error(f"❌ Error getting posts from {channel_username}: {e}")
-            return self._get_demo_posts(channel_username, limit)
+        # Временно используем только демо данные для стабильности
+        logger.info(f"🎭 Using demo data for {channel_username} (Telegram API temporarily disabled)")
+        return self._get_demo_posts(channel_username, limit)
     
     def _get_demo_posts(self, channel_username: str, limit: int):
         """Демо данные для канала с реальными изображениями"""
@@ -295,41 +247,25 @@ async def creative_generate(prompt: Optional[str] = None):
 @app.get("/photo/{channel}/{message_id}")
 async def get_photo(channel: str, message_id: int):
     """Получение фото из Telegram через прокси"""
+    # Временно возвращаем демо изображение для стабильности
     try:
-        # Подключаемся к Telegram если еще не подключены
-        await telegram_client.connect()
+        import requests
+        # Используем Unsplash для демо изображений
+        demo_url = f"https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=600&fit=crop&seed={channel}_{message_id}"
+        response = requests.get(demo_url)
         
-        if not telegram_client.client:
-            raise HTTPException(500, "Telegram client not connected")
-        
-        # Получаем сообщение (используем правильный формат)
-        try:
-            # Пробуем получить канал по username
-            entity = await telegram_client.client.get_entity(channel)
-            message = await telegram_client.client.get_messages(entity, ids=message_id)
-        except Exception as e:
-            logger.error(f"❌ Error getting entity {channel}: {e}")
-            raise HTTPException(404, f"Channel {channel} not found: {str(e)}")
-        
-        if not message or not message.photo:
-            raise HTTPException(404, "Photo not found")
-        
-        # Скачиваем фото в память
-        photo_bytes = await telegram_client.client.download_media(message.photo, file=bytes)
-        
-        if not photo_bytes:
-            raise HTTPException(404, "Photo download failed")
-        
-        # Возвращаем фото как поток
-        return StreamingResponse(
-            io.BytesIO(photo_bytes),
-            media_type="image/jpeg",
-            headers={"Cache-Control": "public, max-age=3600"}
-        )
-        
+        if response.status_code == 200:
+            return StreamingResponse(
+                io.BytesIO(response.content),
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=3600"}
+            )
+        else:
+            raise HTTPException(404, "Demo photo not found")
+            
     except Exception as e:
-        logger.error(f"❌ Error getting photo: {e}")
-        raise HTTPException(500, f"Error getting photo: {str(e)}")
+        logger.error(f"❌ Error getting demo photo: {e}")
+        raise HTTPException(500, f"Error getting demo photo: {str(e)}")
 
 @app.get("/ui", response_class=HTMLResponse)
 def ui():
