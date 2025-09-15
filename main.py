@@ -37,9 +37,9 @@ class PromptReq(BaseModel):
 
 # Демо данные
 CHANNELS = {
-    "fashion": ["burimovasasha", "rogov24", "zarina_brand", "limeofficial", "ekonika"],
-    "beauty": ["goldapple_ru", "glamguruu", "marietells", "sofikshenzdes", "writeforfriends"],
-    "home": ["casacozy", "homiesapiens", "home_where", "objectdesigner"]
+    "fashion": ["@burimovasasha", "@rogov24", "@zarina_brand", "@limeofficial", "@ekonika"],
+    "beauty": ["@goldapple_ru", "@glamguruu", "@marietells", "@sofikshenzdes", "@writeforfriends"],
+    "home": ["@casacozy", "@homiesapiens", "@home_where", "@objectdesigner"]
 }
 
 def create_demo_item(cat, ch, i, views):
@@ -111,7 +111,16 @@ class TelegramClient:
         try:
             logger.info(f"🔍 Fetching real posts from {channel_username}")
             posts = []
-            async for message in self.client.iter_messages(channel_username, limit=limit*2):
+            
+            # Получаем entity канала
+            try:
+                entity = await self.client.get_entity(channel_username)
+                logger.info(f"✅ Found channel: {entity.title}")
+            except Exception as e:
+                logger.error(f"❌ Channel {channel_username} not found: {e}")
+                return self._get_demo_posts(channel_username, limit)
+            
+            async for message in self.client.iter_messages(entity, limit=limit*2):
                 if message.views and message.views >= min_views:
                     # Используем прокси-сервер для получения реальных фото
                     if message.photo:
